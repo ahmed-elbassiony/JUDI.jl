@@ -22,7 +22,6 @@ mutable struct judiWavefieldException <: Exception
 	msg :: String
 end
 
-
 ############################################################
 
 ## outer constructors
@@ -84,26 +83,10 @@ adjoint(A::judiWavefield{vDT}) where vDT = conj(transpose(A))
 
 ####################################################################
 
-for opo=[:+, :-, :*, :/]
-    @eval begin
-		$opo(a::judiWavefield{avDT}, b::T) where {avDT, T<:Number} = eval_op(a, b, $opo)
-        $opo(a::T, b::judiWavefield{avDT}) where {avDT, T<:Number} = eval_op(a, b, $opo)
-		$opo(a::judiWavefield{T}, b::judiWavefield{T}) where T = eval_op(a, b, $opo)
-	end
-end
-
-# minus
-function -(a::judiWavefield{avDT}) where {avDT}
-    c = deepcopy(a)
-    for j=1:a.info.nsrc
-        c.data[j] = -c.data[j]
-    end
-    return c
-end
-
-
-
-function vcat(a::judiWavefield{avDT},b::judiWavefield{bvDT}) where {avDT, bvDT}
+function vcat(ai::Vararg{judiWavefield{avDT}, N}) where {avDT, N}
+	N == 1 && (return ai[1])
+	N > 2 && (return vcat(ai[1], vcat(ai[2:end]...)))
+	a, b = ai
 	m = a.m + b.m
 	n = 1
 	nsrc = a.info.nsrc + b.info.nsrc
@@ -120,17 +103,6 @@ function vcat(a::judiWavefield{avDT},b::judiWavefield{bvDT}) where {avDT, bvDT}
 	info = Info(a.info.n, nsrc, nt)
 	return judiWavefield{avDT}("judiWavefield",info.n * sum(info.nt), 1, info, a.dt ,data)
 end
-
-function vcat(a::Array{judiWavefield{T}, 1}) where T
-    out = a[1]
-    for i=2:length(a)
-        out = [out; a[i]]
-    end
-    return out
-end
-
-# add and subtract, mulitply and divide, norms, dot ...
-
 
 # DFT operator for wavefields, acts along time dimension
 function fft_wavefield(x_in,mode)
