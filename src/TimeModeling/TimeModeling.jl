@@ -52,6 +52,7 @@ include("LinearOperators/judiJacobianExtendedSource.jl")  # Jacobian of extended
 #############################################################################
 # Preconditioners and optimization
 include("Utils/seismic_preconditioners.jl")
+include("Utils/objectives.jl")
 
 #############################################################################
 # Utility types

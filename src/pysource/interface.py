@@ -422,7 +422,7 @@ def grad_fwi(model, recin, rec_coords, u, space_order=8):
 
 
 def J_adjoint(model, src_coords, wavelet, rec_coords, recin, space_order=8,
-              checkpointing=False, n_checkpoints=None, t_sub=1,
+              checkpointing=False, n_checkpoints=None, t_sub=1, obgjfun=None,
               maxmem=None, freq_list=[], dft_sub=None, isic=False, ws=None):
     """
     Jacobian (adjoint fo born modeling operator) operator on a shot record
@@ -485,7 +485,8 @@ def J_adjoint(model, src_coords, wavelet, rec_coords, recin, space_order=8,
 
 def J_adjoint_freq(model, src_coords, wavelet, rec_coords, recin, space_order=8,
                    freq_list=[], is_residual=False, return_obj=False, nlind=False,
-                   dft_sub=None, isic=False, ws=None, t_sub=1, born_fwd=False):
+                   dft_sub=None, isic=False, ws=None, t_sub=1, born_fwd=False,
+                   objfun=None):
     """
     Jacobian (adjoint fo born modeling operator) operator on a shot record
     as a source (i.e data residual). Outputs the gradient with Frequency
@@ -532,14 +533,14 @@ def J_adjoint_freq(model, src_coords, wavelet, rec_coords, recin, space_order=8,
     # Residual and gradient
     if not is_residual:
         if nlind:
-            recin[:] = rec[0].data[:] - (recin[:] - rec[1].data)  # input is observed data
+            obj, recin = objfun(rec[0].data[:], recin[:] - rec[1].data)
         else:
-            recin[:] = rec.data[:] - recin[:]   # input is observed data
+            obj, recin = objfun(rec[0].data[:], recin[:])
 
     g, _ = gradient(model, recin, rec_coords, u, space_order=space_order, isic=isic,
                     freq=freq_list, dft_sub=dft_sub)
     if return_obj:
-        return .5*model.critical_dt*np.linalg.norm(recin)**2, g.data
+        return obj, g.data
     return g.data
 
 
@@ -584,24 +585,24 @@ def J_adjoint_standard(model, src_coords, wavelet, rec_coords, recin, space_orde
     """
     rec, u, _ = op_fwd_J[born_fwd](model, src_coords, rec_coords, wavelet, save=True,
                                    ws=ws, space_order=space_order,
-                                   t_sub=t_sub, nlind=nlind)
+                                   t_sub=t_sub, nlind=nlind, objfun=None)
     # Residual and gradient
     if not is_residual:
         if nlind:
-            recin[:] = rec[0].data[:] - (recin[:] - rec[1].data)  # input is observed data
+            obj, recin = objfun(rec[0].data[:], recin[:] - rec[1].data)
         else:
-            recin[:] = rec.data[:] - recin[:]   # input is observed data
+            obj, recin = objfun(rec[0].data[:], recin[:])
 
     g, _ = gradient(model, recin, rec_coords, u, space_order=space_order, isic=isic)
     if return_obj:
-        return .5*model.critical_dt*np.linalg.norm(recin)**2, g.data
+        return obj, g.data
     return g.data
 
 
 def J_adjoint_checkpointing(model, src_coords, wavelet, rec_coords, recin, space_order=8,
                             is_residual=False, n_checkpoints=None, born_fwd=False,
                             maxmem=None, return_obj=False, isic=False, ws=None,
-                            t_sub=1, nlind=False):
+                            t_sub=1, nlind=False, objfun=None):
     """
     Jacobian (adjoint fo born modeling operator) operator on a shot record
     as a source (i.e data residual). Outputs the gradient with Checkpointing.
@@ -673,16 +674,14 @@ def J_adjoint_checkpointing(model, src_coords, wavelet, rec_coords, recin, space
     if is_residual is True:  # input data is already the residual
         rec.data[:] = recin[:]
     else:
-        # This won't work with MPI
         if nlind:
-            rec.data[:] = rec_g[0].data[:] - (recin[:] - rec_g[1].data)
+            obj, recin[:] = objfun(rec[0].data[:], recin[:] - rec[1].data)
         else:
-            rec.data[:] = rec_g.data[:] - recin[:]
-
+            obj, recin[:] = objfun(rec[0].data[:], recin[:])
     wrp.apply_reverse()
 
     if return_obj:
-        return .5*model.critical_dt*norm(rec)**2, g.data
+        return obj, g.data
     return g.data
 
 
